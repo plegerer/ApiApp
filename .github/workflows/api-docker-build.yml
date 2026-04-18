@@ -30,7 +30,7 @@ jobs:
         id: meta_api
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}/apiapp
+          images: ghcr.io/${{ github.repository }}/api
 
       - name: Build and push API
         uses: docker/build-push-action@v5
