@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build and Push Docker Images
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
 
     permissions:
       contents: read
-      packages: write   # wichtig für GHCR
+      packages: write
 
     steps:
       - name: Checkout
@@ -23,17 +23,38 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
-        id: meta
+      # =========================
+      # API IMAGE
+      # =========================
+      - name: Extract metadata (API)
+        id: meta_api
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ github.repository }}/apiapp
 
-      - name: Build and push
+      - name: Build and push API
         uses: docker/build-push-action@v5
         with:
           context: ./ApiApp
           file: ./ApiApp/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta_api.outputs.tags }}
+          labels: ${{ steps.meta_api.outputs.labels }}
+
+      # =========================
+      # WORKER IMAGE
+      # =========================
+      - name: Extract metadata (Worker)
+        id: meta_worker
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/worker
+
+      - name: Build and push Worker
+        uses: docker/build-push-action@v5
+        with:
+          context: ./WorkerApp
+          file: ./WorkerApp/Dockerfile
+          push: true
+          tags: ${{ steps.meta_worker.outputs.tags }}
+          labels: ${{ steps.meta_worker.outputs.labels }}
