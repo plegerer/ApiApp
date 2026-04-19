@@ -58,3 +58,19 @@ jobs:
           push: true
           tags: ${{ steps.meta_worker.outputs.tags }}
           labels: ${{ steps.meta_worker.outputs.labels }}
+
+  deploy:
+    needs: build-and-push   # 🔥 WICHTIG: wartet auf Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/apps/api
+            docker compose pull
+            docker compose up -d --remove-orphans

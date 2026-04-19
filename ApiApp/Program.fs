@@ -5,6 +5,23 @@ open Microsoft.Extensions.DependencyInjection
 open Falco
 open Falco.Routing
 open Azure.Messaging.ServiceBus
+open Microsoft.AspNetCore.Http
+
+let apiKeyHeader = "X-API-KEY"
+let validApiKeys = [Environment.GetEnvironmentVariable("X-API-KEY")]
+
+let validateApiKey (ctx: HttpContext) =
+    match ctx.Request.Headers.TryGetValue(apiKeyHeader) with
+    | true, keys when List.contains (keys.[0]) validApiKeys -> true
+    | _ -> false
+
+let apiKeyMiddleware (next: HttpHandler) (ctx: HttpContext) =
+    if validateApiKey ctx then
+        next ctx
+    else
+        let unauthorizedResponse =
+            Response.withStatusCode 401 >> Response.ofPlainText "Unauthorized"
+        unauthorizedResponse ctx
 
 // POST Handler
 let postHandler : HttpHandler =
@@ -16,9 +33,11 @@ let postHandler : HttpHandler =
             let sender = ctx.RequestServices.GetService<ServiceBusSender>()
 
             let message = ServiceBusMessage(body)
-            let! _ =  sender.SendMessageAsync(message)
-
-            return! Response.ofPlainText "Message sent" ctx
+            try
+                let! _ =  sender.SendMessageAsync(message)
+                return! (Response.withStatusCode 202 >> Response.ofPlainText "Message sent") ctx
+            with ex ->
+                return! (Response.withStatusCode 500 >> Response.ofPlainText ex.Message) ctx
         }
 
 let builder = WebApplication.CreateBuilder()
@@ -33,7 +52,7 @@ let wapp = builder.Build()
 
 wapp.UseRouting()
     .UseFalco([
-        get "/" (Response.ofPlainText "Hello World!")
-        post "/api/messages" postHandler
+        //get "/" (Response.ofPlainText "Hello World!")
+        post "/api/messages" (apiKeyMiddleware postHandler)
     ])
-    .Run(Response.ofPlainText "Not found")
+    .Run(Response.withStatusCode 404 >> Response.ofPlainText "Not found")
