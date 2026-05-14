@@ -68,8 +68,9 @@ let createBatchHandler
                         })
                     |> Task.WhenAll
                 return!
-                    Response.ofJson
-                        { jobs = results |> Array.toList }
+                    (Response.withStatusCode 202
+                        >>Response.ofJson
+                        { jobs = results |> Array.toList })
                         ctx
         }
 
