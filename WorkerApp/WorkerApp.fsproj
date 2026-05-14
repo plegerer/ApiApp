@@ -16,4 +16,8 @@
     <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.4" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\Shared.fsproj" />
+  </ItemGroup>
 </Project>
