@@ -7,17 +7,17 @@ open Thoth.Json.Net
 // DOMAIN TYPES
 // ======================================================
 
-type UdpdateZrvCommand =
+type UdpdateZvrCommand =
     { zvr : string }
 
-module UdpdateZrvCommand =
+module UdpdateZvrCommand =
 
-    let encoder (x : UdpdateZrvCommand) =
+    let encoder (x : UdpdateZvrCommand) =
         Encode.object
             [ "zvr", Encode.string x.zvr
               ]
 
-    let decoder : Decoder<UdpdateZrvCommand> =
+    let decoder : Decoder<UdpdateZvrCommand> =
         Decode.object (fun get ->
             { zvr =
                 get.Required.Field "zvr" Decode.string
@@ -42,46 +42,199 @@ module GetDocIntelCommand =
             { uri = get.Required.Field "uri" Decode.string
               zvr = get.Required.Field "zvr" Decode.string })
 
+// ------------------------------------------------------
+
+type ZvrFunktionaere = {
+    Funktion : string
+    Nachname : string
+    Vorname : string
+    GueltigBis : DateTimeOffset
+}
+
+module ZvrFunktionaere =
+
+    let encoder (x : ZvrFunktionaere) =
+        Encode.object [
+            "funktion", Encode.string x.Funktion
+            "nachname", Encode.string x.Nachname
+            "vorname", Encode.string x.Vorname
+            "gueltigBis", Encode.datetimeOffset x.GueltigBis
+        ]
+
+    let decoder : Decoder<ZvrFunktionaere> =
+        Decode.object (fun get ->
+            {
+                Funktion = get.Required.Field "funktion" Decode.string
+                Nachname = get.Required.Field "nachname" Decode.string
+                Vorname = get.Required.Field "vorname" Decode.string
+                GueltigBis = get.Required.Field "gueltigBis" Decode.datetimeOffset
+            })
+
+type Address = {
+    Formatted : string
+    City: string option
+    Country : string option
+    PostalCode : string option
+    StreetAddress : string option
+}
+
+module Address =
+
+    let encoder (x : Address) =
+        Encode.object [
+            "formatted", Encode.string x.Formatted
+
+            "city",
+            x.City
+            |> Option.map Encode.string
+            |> Option.defaultValue Encode.nil
+
+            "country",
+            x.Country
+            |> Option.map Encode.string
+            |> Option.defaultValue Encode.nil
+
+            "postalCode",
+            x.PostalCode
+            |> Option.map Encode.string
+            |> Option.defaultValue Encode.nil
+
+            "streetAddress",
+            x.StreetAddress
+            |> Option.map Encode.string
+            |> Option.defaultValue Encode.nil
+        ]
+
+    let decoder : Decoder<Address> =
+        Decode.object (fun get ->
+            {
+                Formatted = get.Required.Field "formatted" Decode.string
+                City = get.Optional.Field "city" Decode.string
+                Country = get.Optional.Field "country" Decode.string
+                PostalCode = get.Optional.Field "postalCode" Decode.string
+                StreetAddress = get.Optional.Field "streetAddress" Decode.string
+            })
+
+type ZvrUpdatePostedEvent = {
+    Stichtag : DateTimeOffset
+    Zvr : string
+    Vereinsname : string
+    Zustelladresse : Address option
+    Co : string option
+    Sitz : string
+    ZvrFunktionaere : ZvrFunktionaere list
+}
+
+module ZvrUpdatePostedEvent =
+
+    let encoder (x : ZvrUpdatePostedEvent) =
+        Encode.object [
+
+            "stichtag", Encode.datetimeOffset x.Stichtag
+            "zvr", Encode.string x.Zvr
+            "vereinsname", Encode.string x.Vereinsname
+            "zustelladresse",
+            x.Zustelladresse
+            |> Option.map Address.encoder
+            |> Option.defaultValue Encode.nil
+            "co",
+            x.Co
+            |> Option.map Encode.string
+            |> Option.defaultValue Encode.nil
+            "sitz",
+            Encode.string x.Sitz
+            "zvrFunktionaere",
+            x.ZvrFunktionaere
+            |> List.map ZvrFunktionaere.encoder
+            |> Encode.list
+        ]
+
+    let decoder : Decoder<ZvrUpdatePostedEvent> =
+        Decode.object (fun get ->
+
+            {
+                Stichtag = get.Required.Field "stichtag" Decode.datetimeOffset
+                Zvr = get.Required.Field "zvr" Decode.string
+
+                Vereinsname =
+                    get.Required.Field
+                        "vereinsname"
+                        Decode.string
+
+                Zustelladresse =
+                    get.Optional.Field
+                        "zustelladresse"
+                        Address.decoder
+
+                Co =
+                    get.Optional.Field
+                        "co"
+                        Decode.string
+
+                Sitz =
+                    get.Required.Field
+                        "sitz"
+                        Decode.string
+
+                ZvrFunktionaere =
+                    get.Required.Field
+                        "zvrFunktionaere"
+                        (Decode.list ZvrFunktionaere.decoder)
+            })
+
 // ======================================================
 // MESSAGE
 // ======================================================
 
 type Message =
-    | UdpdateZrvCommand of UdpdateZrvCommand
+    | UdpdateZvrCommand of UdpdateZvrCommand
     | GetDocIntelCommand of GetDocIntelCommand
+    | ZvrUpdatePostedEvent of ZvrUpdatePostedEvent
 
 module Message =
 
     let messageType =
         function
-        | UdpdateZrvCommand _ ->
-            "UdpdateZrvCommand"
+        | UdpdateZvrCommand _ ->
+            "UdpdateZvrCommand"
 
         | GetDocIntelCommand _ ->
             "GetDocIntelCommand"
 
+        | ZvrUpdatePostedEvent _ ->
+            "ZvrUpdatePostedEvent"
+
     let payloadEncoder =
         function
-        | UdpdateZrvCommand x ->
-            UdpdateZrvCommand.encoder x
+        | UdpdateZvrCommand x ->
+            UdpdateZvrCommand.encoder x
 
         | GetDocIntelCommand x ->
             GetDocIntelCommand.encoder x
+
+        | ZvrUpdatePostedEvent x ->
+            ZvrUpdatePostedEvent.encoder x
 
     let payloadDecoder messageType : Decoder<Message> =
 
         match messageType with
 
-        | "UdpdateZrvCommand" ->
-            UdpdateZrvCommand.decoder
-            |> Decode.map UdpdateZrvCommand
+        | "UdpdateZvrCommand" ->
+            UdpdateZvrCommand.decoder
+            |> Decode.map UdpdateZvrCommand
 
         | "GetDocIntelCommand" ->
             GetDocIntelCommand.decoder
             |> Decode.map GetDocIntelCommand
 
+        | "ZvrUpdatePostedEvent" ->
+            ZvrUpdatePostedEvent.decoder
+            |> Decode.map ZvrUpdatePostedEvent
+
         | x ->
             Decode.fail $"Unknown messageType '{x}'"
+
+    let encodePayloadToString (m:Message) = payloadEncoder m |> Encode.toString 4
 
 // ======================================================
 // METADATA
@@ -213,5 +366,7 @@ module Envelope =
         (json : string) =
 
         Decode.fromString decoder json
+
+    
 
 

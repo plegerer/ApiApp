@@ -3,6 +3,7 @@ open Microsoft.Extensions.Hosting
 open Azure.Messaging.ServiceBus
 open Azure.Storage.Blobs
 
+
 Host.CreateDefaultBuilder()
     .ConfigureServices(fun context services ->
 
@@ -15,7 +16,8 @@ Host.CreateDefaultBuilder()
         services.AddSingleton(ServiceBusClient(sbConnection)) |> ignore
         services.AddSingleton(BlobServiceClient(blobConnection)) |> ignore
 
-        services.AddHostedService<ServiceBusBlobWorker.Worker>() |> ignore
+        services.AddHostedService<ServiceBusUpdateZvrWorker.Worker>() |> ignore
+        services.AddHostedService<ServiceBusGetDocIntelWorker.Worker>() |> ignore
     )
     .Build()
     .Run()

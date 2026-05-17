@@ -2,6 +2,7 @@ namespace Shared.ZvrTypes
 
 open System.Text.RegularExpressions
 open Thoth.Json.Net
+open System.Threading.Tasks
 
 type ZvrImportRequest =
     { Zvrs : string list }
@@ -29,3 +30,27 @@ module ZvrImportRequest =
         Encode.object
             [ "zvrs",
             Encode.list (List.map Encode.string request.Zvrs) ]
+
+module TaskResult =
+
+    let bind (f : 'a -> Task<Result<'b,'e>>) (input : Task<Result<'a,'e>>) =
+        task {
+            let! result = input
+
+            match result with
+            | Ok value ->
+                return! f value
+
+            | Error err ->
+                return Error err
+        }
+
+    let map (f : 'a -> 'b) (input : Task<Result<'a,'e>>) =
+        task {
+            let! result = input
+
+            return Result.map f result
+        }
+
+    let ofResult result =
+        task { return result }

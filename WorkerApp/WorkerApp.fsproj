@@ -7,13 +7,16 @@
 
 
   <ItemGroup>
-    <Compile Include="Worker.fs" />
+    <Compile Include="ZvrApi.fs" />
+    <Compile Include="UpdateZvrWorker.fs" />
+    <Compile Include="GetDocIntelWorker.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.1" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
+    <PackageReference Include="FsHttp" Version="15.0.3" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.4" />
   </ItemGroup>
 

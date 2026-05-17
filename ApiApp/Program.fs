@@ -10,16 +10,28 @@ open Azure.Messaging.ServiceBus
 open Microsoft.AspNetCore.Http
 open Shared.ZvrTypes
 open Shared.Messaging
+open Shared.Topology
 open System.Threading.Tasks
+open Azure.Storage.Blobs
+
+
 
 let builder = WebApplication.CreateBuilder()
-let connectionString = Environment.GetEnvironmentVariable("SERVICEBUS_CONNECTION_STRING")
-let queueNameTest = Environment.GetEnvironmentVariable("SERVICEBUS_QUEUE_NAME")
-let client = new ServiceBusClient(connectionString)
+let busConnectionString = Environment.GetEnvironmentVariable "SERVICEBUS_CONNECTION_STRING"
+let blobConnectionString = Environment.GetEnvironmentVariable "BLOB_CONNECTION_STRING"
+
+
+let topology = Topology.loadTopology (Path.Combine(AppContext.BaseDirectory, "topology.json"))
+
+let queueName = Topology.getOutgoingQueue "ZvrImportRequest" topology|> Option.defaultValue "error occurred or does not exists"
+let containerName = Topology.getArchiveContainer "ZvrImportRequest" topology|> Option.defaultValue "error occurred or does not exists"
+let busClient = new ServiceBusClient(busConnectionString)
+let blobClient = new BlobServiceClient(blobConnectionString)
 let apiKeyHeader = "X-API-KEY"
 let validApiKeys = [Environment.GetEnvironmentVariable("X-API-KEY")]
 
-builder.Services.AddSingleton<ServiceBusClient>(client) |> ignore
+builder.Services.AddSingleton<ServiceBusClient> busClient |> ignore
+builder.Services.AddSingleton<BlobServiceClient> blobClient |> ignore
 
 type JobResult =
     { id : string
@@ -28,6 +40,16 @@ type JobResult =
 type BatchResponse =
     { jobs : JobResult list }
 
+let private writeBlob (container: BlobContainerClient) (id: string) (content: string) =
+    task {
+        let blob = container.GetBlobClient($"{id}.json")
+        let bytes = System.Text.Encoding.UTF8.GetBytes content
+        use ms = new System.IO.MemoryStream(bytes)
+        let! _ =  blob.UploadAsync(ms, overwrite = true)
+        return ()
+    }
+
+
 let createBatchHandler
     (decode : string -> Result<'Request, string>)
     (getItems : 'Request -> 'Item list)
@@ -35,8 +57,10 @@ let createBatchHandler
     (validate : 'Item -> bool)
     (serialize : 'Item -> string)
     (queueName : string)
+    (containerName : string)
     : HttpHandler =
-    let sender = client.CreateSender(queueName)
+    let sender = busClient.CreateSender queueName
+    let containerClient = blobClient.GetBlobContainerClient containerName
     fun ctx ->
         task {
             use reader = new StreamReader(ctx.Request.Body)
@@ -58,6 +82,7 @@ let createBatchHandler
                                 let message =
                                     ServiceBusMessage(serialize item)
                                 do! sender.SendMessageAsync message
+                                do! writeBlob containerClient (DateTime.UtcNow.ToString() + "_" + id) (serialize item)
                                 return
                                     { id = id
                                       status = "queued" }
@@ -91,7 +116,7 @@ let apiKeyMiddleware (next: HttpHandler) (ctx: HttpContext) =
         unauthorizedResponse ctx
 
 // POST Handler
-let postHandler : HttpHandler =
+let updateZvrDataHandler : HttpHandler =
         createBatchHandler
             ZvrImportRequest.decodeFromString
             (fun r -> r.Zvrs)
@@ -105,15 +130,16 @@ let postHandler : HttpHandler =
                             causationId = None
                             createdAt = DateTime.UtcNow 
                             schemaVersion =1}
-                    message = UdpdateZrvCommand {zvr = i}
+                    message = UdpdateZvrCommand {zvr = i}
                 }|>Envelope.encodeToString)
-            queueNameTest
+            queueName
+            containerName
 
 let wapp = builder.Build()
 
 wapp.UseRouting()
     .UseFalco([
         get "/" (Response.ofPlainText "Hello World!")
-        post "/api/messages" (apiKeyMiddleware postHandler)
+        post "/api/update-zvr" (apiKeyMiddleware updateZvrDataHandler)
     ])
     .Run(Response.withStatusCode 404 >> Response.ofPlainText "Not found")

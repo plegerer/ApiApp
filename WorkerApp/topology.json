@@ -1,0 +1,22 @@
+{
+  "Workers": [
+    {
+      "Name" : "ZvrImportRequest",
+      "OutgoingQueue": "update-zvr-command",
+      "ArchiveContainer" : "update-zvr-command"
+    },
+    {
+      "Name" : "UdpdateZvrCommand",
+      "IncomingQueue": "update-zvr-command",
+      "OutgoingQueue": "get-doc-intel-command",
+      "ArchiveContainer": "get-doc-intel-command"
+    },
+    {  
+      "Name" : "GetDocIntelCommand",
+      "IncomingQueue": "get-doc-intel-command",
+      "ArchiveContainer": "zvr-update-posted-event"
+    }
+  ]
+}
+
+
